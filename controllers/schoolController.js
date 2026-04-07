@@ -1,11 +1,13 @@
 const db = require("../config/db");
+const calculateDistance = require("../utils/distance");
 
 const addSchool = (req, res) => {
   const { name, address, latitude, longitude } = req.body;
-//validatoin
+
   if (!name || !address || latitude === undefined || longitude === undefined) {
     return res.status(400).json({
-      message: "All fields are required"
+      success: false,
+      message: "All fields are required: name, address, latitude, longitude"
     });
   }
 
@@ -55,4 +57,50 @@ const addSchool = (req, res) => {
   });
 };
 
-module.exports = { addSchool };
+const listSchools = (req, res) => {
+  const userLat = parseFloat(req.query.latitude);
+  const userLon = parseFloat(req.query.longitude);
+
+  if (isNaN(userLat) || isNaN(userLon)) {
+    return res.status(400).json({
+      success: false,
+      message: "Enter vaild latutude and longitude"
+    });
+  }
+
+  const sql = "SELECT * FROM schools";
+
+  db.query(sql, (err, results) => {
+    if (err) {
+      return res.status(500).json({
+        success: false,
+        message: "Error fetching schools",
+        error: err.message
+      });
+    }
+
+    const sortedSchools = results
+      .map((school) => {
+        const distance = calculateDistance(
+          userLat,
+          userLon,
+          school.latitude,
+          school.longitude
+        );
+
+        return {
+          ...school,
+          distance: Number(distance.toFixed(2))
+        };
+      })
+      .sort((a, b) => a.distance - b.distance);
+
+    return res.status(200).json({
+      success: true,
+      count: sortedSchools.length,
+      data: sortedSchools
+    });
+  });
+};
+
+module.exports = { addSchool, listSchools };
